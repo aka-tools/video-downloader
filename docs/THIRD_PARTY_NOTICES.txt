@@ -1,0 +1,25 @@
+THIRD-PARTY SOFTWARE NOTICES
+============================
+Video Downloader includes the following open-source components. Each remains under
+its own license. When redistributing Video Downloader you must keep this file.
+
+yt-dlp            Unlicense (public domain)        https://github.com/yt-dlp/yt-dlp
+FFmpeg            GPL v3 (this build includes GPL  https://ffmpeg.org/legal.html
+                  components, e.g. x264)           Source: https://ffmpeg.org/download.html
+                  Bundled via imageio-ffmpeg       https://github.com/imageio/imageio-ffmpeg (BSD-2)
+                  Build source/details:            https://github.com/BtbN/FFmpeg-Builds
+Playwright        Apache License 2.0               https://github.com/microsoft/playwright-python
+Node.js           MIT (bundled with Playwright)    https://nodejs.org
+greenlet          MIT                              https://github.com/python-greenlet/greenlet
+pyee              MIT                              https://github.com/jfhbrook/pyee
+typing-extensions PSF License                      https://github.com/python/typing_extensions
+Python runtime    PSF License                      https://www.python.org/
+PyInstaller       GPL v2 with bootloader exception https://pyinstaller.org (the exception allows
+                  distributing the built app under any license)
+
+GPL notice for FFmpeg: FFmpeg is distributed unmodified. Its complete source code is
+available from the links above. You may redistribute and/or modify FFmpeg under the
+terms of the GNU General Public License v3.
+
+Microsoft Edge (used for sign-in) is NOT included; the app uses the copy already
+installed on Windows.

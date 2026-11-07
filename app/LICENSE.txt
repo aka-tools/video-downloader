@@ -1,0 +1,55 @@
+VIDEO DOWNLOADER - END-USER LICENSE AGREEMENT
+Copyright (c) 2026 AKA. All rights reserved.
+
+Video Downloader ("the Software") is free software in the sense of free of charge
+("freeware"). It is NOT open-source. By installing or using the Software you agree
+to these terms.
+
+1. PERMITTED USE
+   You may install and use the Software on any number of computers, for personal,
+   educational or internal business use, free of charge. You may give the original,
+   unmodified installer to others free of charge.
+
+2. RESTRICTIONS
+   You may not, without the author's written permission:
+   a) sell, rent or charge for the Software, or include it in a paid product or service;
+   b) modify, rebrand, or distribute modified copies of the Software;
+   c) remove or alter this license, the copyright notice or the author's name;
+   d) claim the Software, or any part of its original code, design or icon, as your own.
+
+3. OWNERSHIP
+   The Software's original source code, user interface, name and icon are the
+   intellectual property of AKA and are protected by copyright law
+   and international treaties. All rights not expressly granted are reserved.
+
+4. THIRD-PARTY COMPONENTS
+   The Software includes open-source components (yt-dlp, FFmpeg, Playwright,
+   Node.js, Python and others) that remain under their own licenses. See
+   THIRD_PARTY_NOTICES.txt. Nothing in this agreement limits your rights under
+   those licenses.
+
+5. YOUR RESPONSIBILITY FOR CONTENT
+   The Software is a tool. You are solely responsible for what you download with it.
+   Only download content you own or are permitted to download, and follow the
+   terms of the websites and institutions concerned (for example, your school's
+   rules on lecture recordings, or a video platform's terms of service).
+   Do not redistribute recordings that contain other people without permission.
+
+6. PRIVACY
+   The Software collects no personal data and contains no telemetry. Details are in
+   README.txt ("Privacy & Security").
+
+7. NO WARRANTY
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO MERCHANTABILITY, FITNESS FOR A PARTICULAR
+   PURPOSE AND NON-INFRINGEMENT.
+
+8. LIMITATION OF LIABILITY
+   IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+   LIABILITY ARISING FROM THE USE OF, OR INABILITY TO USE, THE SOFTWARE.
+
+9. TERMINATION
+   This license ends automatically if you break these terms. You must then uninstall
+   the Software and destroy all copies.
+
+Contact for permissions: see SECURITY.md / the official release page.

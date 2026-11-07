@@ -1,0 +1,123 @@
+# Copyright (c) 2026 AKA. All rights reserved.
+#
+# ONE-CLICK RELEASE
+#   GitHub -> Actions -> "Build & release" -> Run workflow
+#
+# Builds Video Downloader on a clean, throw-away Windows machine owned by GitHub (never a
+# personal PC), runs the security scans and tests, and publishes ONE file:
+#   VideoDownloader-Setup-V1.exe   (+ its SHA-256 checksum)
+# with a signed build-provenance attestation anyone can verify:
+#   gh attestation verify VideoDownloader-Setup-V1.exe -R <owner>/<repo>
+name: Build & release
+
+on:
+  workflow_dispatch:        # the "Run workflow" button
+  push:
+    tags: ["v*"]            # or push a tag, e.g. v1.0.0
+
+permissions:
+  contents: write           # create the GitHub Release
+  id-token: write           # sign the provenance attestation
+  attestations: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install hash-verified dependencies
+        run: |
+          python -m pip install --disable-pip-version-check --only-binary=:all: --require-hashes -r build_tools/requirements.lock
+
+      - name: Security scans + tests (any finding stops the release)
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory _build -Force | Out-Null
+          python -m pip freeze --exclude-editable | Out-File -Encoding ascii _build\installed.txt
+          python -m pip install --disable-pip-version-check bandit pip-audit
+          bandit -q -r app -ll
+          if ($LASTEXITCODE) { exit 1 }
+          pip-audit -r _build\installed.txt --no-deps --disable-pip --progress-spinner off
+          if ($LASTEXITCODE) { exit 1 }
+          python -m unittest discover -s build_tools/tests -v
+          if ($LASTEXITCODE) { exit 1 }
+
+      - name: Stamp the official repository into the app (enables the update check)
+        shell: pwsh
+        run: |
+          $f = "app\updater.py"
+          $c = Get-Content $f -Raw
+          $new = $c -replace 'UPDATE_REPO = ""', "UPDATE_REPO = `"$env:GITHUB_REPOSITORY`""
+          if ($new -eq $c) { Write-Error "UPDATE_REPO placeholder not found"; exit 1 }
+          Set-Content $f $new -NoNewline -Encoding utf8
+
+      - name: Build app
+        shell: pwsh
+        run: |
+          $ver, $label = (python build_tools\make_version_info.py _build\version_info.txt).Split(" ")
+          "VER=$ver"     | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
+          "LABEL=$label" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
+          $root = (Get-Location).Path
+          python -m PyInstaller --noconfirm --clean --onedir --windowed --name VideoDownloader `
+            --distpath _build\dist --workpath _build\work --specpath _build `
+            --icon "$root\app\icon.ico" --version-file "$root\_build\version_info.txt" `
+            --add-data "$root\app\icon.ico;." --add-data "$root\app\LICENSE.txt;." `
+            --collect-all imageio_ffmpeg --collect-all playwright --collect-submodules yt_dlp `
+            --hidden-import canvas_helper --hidden-import secure_store --hidden-import transcript `
+            --hidden-import updater app\video_downloader.py
+          if ($LASTEXITCODE) { exit 1 }
+
+      # Code signing goes here once you have a certificate (e.g. Azure Trusted Signing):
+      # sign _build\dist\VideoDownloader\VideoDownloader.exe, then the installer below.
+
+      - name: Build single-file installer
+        shell: pwsh
+        run: |
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { choco install innosetup -y --no-progress; if ($LASTEXITCODE) { exit 1 } }
+          & $iscc /Q "/DAppVersion=$env:VER" "/DAppLabel=$env:LABEL" build_tools\VideoDownloader.iss
+          if ($LASTEXITCODE) { exit 1 }
+          $exe = "VideoDownloader-Setup-$env:LABEL.exe"
+          $hash = (Get-FileHash $exe -Algorithm SHA256).Hash
+          "$hash  $exe" | Out-File -Encoding ascii "$exe.sha256"
+          "EXE=$exe"   | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
+          "HASH=$hash" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
+
+      - uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: ${{ env.EXE }}
+
+      - name: Publish the release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ env.VER }}
+          name: Video Downloader ${{ env.LABEL }}
+          make_latest: true
+          files: |
+            ${{ env.EXE }}
+            ${{ env.EXE }}.sha256
+          body: |
+            ## Download
+            **[${{ env.EXE }}](https://github.com/${{ github.repository }}/releases/download/v${{ env.VER }}/${{ env.EXE }})**: one file. Double-click it and click Install. No administrator rights needed.
+
+            Windows may show "Windows protected your PC" because the app isn't commercially signed yet. Click **More info**, then **Run anyway**.
+
+            ## Verify your download (optional)
+            - SHA-256: `${{ env.HASH }}`
+              (PowerShell: `Get-FileHash .\${{ env.EXE }}`)
+            - Built by GitHub Actions from this repository, with a signed provenance attestation:
+              `gh attestation verify ${{ env.EXE }} -R ${{ github.repository }}`
+
+            © 2026 AKA. All rights reserved. Free to use and share unmodified. See the license shown during installation.

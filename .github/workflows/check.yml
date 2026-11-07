@@ -1,0 +1,42 @@
+# Copyright (c) 2026 AKA. All rights reserved.
+# Runs on every change: security scans + tests on a clean Windows machine.
+# A red X on a commit means something broke; nothing is released from here.
+name: Check
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install hash-verified dependencies
+        run: |
+          python -m pip install --disable-pip-version-check --only-binary=:all: --require-hashes -r build_tools/requirements.lock
+
+      - name: Security scans + tests
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory _build -Force | Out-Null
+          python -m pip freeze --exclude-editable | Out-File -Encoding ascii _build\installed.txt
+          python -m pip install --disable-pip-version-check bandit pip-audit
+          bandit -q -r app -ll
+          if ($LASTEXITCODE) { exit 1 }
+          pip-audit -r _build\installed.txt --no-deps --disable-pip --progress-spinner off
+          if ($LASTEXITCODE) { exit 1 }
+          python -m unittest discover -s build_tools/tests -v
+          if ($LASTEXITCODE) { exit 1 }

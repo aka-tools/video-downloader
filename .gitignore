@@ -1,0 +1,17 @@
+# build output - never commit
+_build/
+VideoDownloader-Setup-*.exe
+*.spec
+__pycache__/
+*.pyc
+
+# local tools
+.venv/
+.vscode/
+.idea/
+
+# never commit secrets or personal data
+*.pfx
+*.p12
+cookies*.txt
+*.log
