@@ -14,6 +14,10 @@ Users see "V1". Internally the app uses the number 1.0.0 (for the update check).
 - Subtitles built into the .mp4 AND saved as "<video name>.srt" next to it, so CC works in
   Windows Media Player, Films & TV and VLC (Media Player doesn't read subtitles inside .mp4).
 - YouTube captions converted to .srt; clear log message when a video has no captions.
+- Short, sync-friendly file names: "MAICEN | 0526 | M6U3 | LS1 | Lilian Ho" is saved as
+  "M6U3 LS1 - Lilian Ho" (session code first; no long video ID).
+- File names are sized to the folder so the full path stays under Windows' 260-character limit
+  (Notepad/Explorer can't open longer paths). Warns before downloading into a folder that is too long.
 
 **Other videos**
 - YouTube, Vimeo and 1,000+ sites; quality options incl. audio-only MP3; several links, playlists.

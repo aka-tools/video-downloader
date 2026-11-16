@@ -27,6 +27,7 @@ from tkinter import ttk, filedialog, messagebox, simpledialog
 
 import imageio_ffmpeg
 import yt_dlp
+from yt_dlp.postprocessor.metadataparser import MetadataParserPP
 
 import canvas_helper
 import transcript
@@ -68,6 +69,61 @@ _h = logging.handlers.RotatingFileHandler(os.path.join(LOG_DIR, "app.log"), maxB
                                           backupCount=3, encoding="utf-8")
 _h.setFormatter(logging.Formatter("%(asctime)s  %(levelname)s  %(message)s"))
 logger.addHandler(_h)
+
+
+WIN_MAX_PATH = 259                 # Notepad/Explorer can't open longer paths (260 incl. terminator)
+LONGEST_SUFFIX = " - transcript.txt"
+TEMP_MARGIN = 12                   # yt-dlp temp names like ".f399.mp4.part"
+FULL_NAME_CHARS = 90               # title length when the folder is short enough
+
+# Lecture titles like "MAICEN | 0526 | M6U3 | LS1 | Lilian Ho" -> "M6U3 LS1 - Lilian Ho":
+# the session code goes first (the Obsidian vault sync reads it from the file name) and the
+# course/intake parts, which already appear in the folder names, are dropped.
+TITLE_RULES = [
+    (r"^.*?\|\s*(M\d+U\d+)\s*\|\s*(LS\d+)\s*\|\s*", r"\1 \2 - "),
+    (r"\s*[|｜]\s*", " - "),
+]
+
+
+def tidy_title(title):
+    """Same rules as the download step, for tests and previews."""
+    for pattern, repl in TITLE_RULES:
+        title = re.sub(pattern, repl, title)
+    return title
+
+
+def long_paths_enabled():
+    """True when Windows lets programs write paths over 260 characters (temp files need less margin)."""
+    if not sys.platform.startswith("win"):
+        return True
+    try:
+        import winreg
+        with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"SYSTEM\CurrentControlSet\Control\FileSystem") as k:
+            return winreg.QueryValueEx(k, "LongPathsEnabled")[0] == 1
+    except OSError:
+        return False
+
+
+def name_template(folder):
+    """
+    File-name template that keeps every saved file's full path under Windows' 260-char
+    limit, so Notepad and Explorer can open it. Returns (template, title_chars, shortened).
+    The session code comes first in the title, so cutting the end keeps names unique.
+    """
+    margin = 0 if long_paths_enabled() else TEMP_MARGIN
+    budget = WIN_MAX_PATH - len(os.path.abspath(folder)) - 1 - len(LONGEST_SUFFIX) - margin
+    if budget >= FULL_NAME_CHARS:
+        return os.path.join(folder, f"%(title).{FULL_NAME_CHARS}s.%(ext)s"), FULL_NAME_CHARS, False
+    if budget >= 20:
+        return os.path.join(folder, f"%(title).{budget}s.%(ext)s"), budget, True
+    title = max(budget - 9, 8)                 # folder far too long: add an 8-char ID to stay unique
+    return os.path.join(folder, f"%(title).{title}s %(id).8s.%(ext)s"), title, True
+
+
+def folder_too_long(folder):
+    """True when not even an 8-char name + ID fits under Windows' 260-char limit."""
+    margin = 0 if long_paths_enabled() else TEMP_MARGIN
+    return WIN_MAX_PATH - len(os.path.abspath(folder)) - 1 - len(LONGEST_SUFFIX) - margin < 17
 
 
 def redact(url):
@@ -476,6 +532,17 @@ class App(tk.Tk):
                 APP_NAME, f"Only {free_gb:.1f} GB free on that drive. Lectures can be 1-3 GB each.\n"
                           f"Continue anyway?"):
             return
+        if folder_too_long(folder) and not messagebox.askyesno(
+                APP_NAME, f"The 'Save to' folder path is {len(folder)} characters long.\n\n"
+                          f"Windows can't open files whose full path is over 260 characters, so Notepad "
+                          f"and Explorer won't open what you download there.\n\n"
+                          f"Choose a shorter folder (recommended), or continue anyway?"):
+            return
+        _, chars, shortened = name_template(folder)
+        if shortened and not folder_too_long(folder):
+            self._write_log(f"ℹ The 'Save to' folder path is {len(folder)} characters long. To stay under "
+                            f"Windows' 260-character limit (so Notepad can open the files), names are "
+                            f"kept to {chars} characters.")
         self._persist()
         self._set_busy(True)
         threading.Thread(target=self._worker, args=(links, folder), daemon=True).start()
@@ -498,7 +565,7 @@ class App(tk.Tk):
         log = lambda t: self.msgs.put(("log", t))  # noqa: E731
         opts = {
             "format": QUALITY_OPTIONS[label],
-            "outtmpl": os.path.join(folder, "%(title).150s [%(id)s].%(ext)s"),
+            "outtmpl": name_template(folder)[0],
             "paths": {"temp": folder},
             "ffmpeg_location": imageio_ffmpeg.get_ffmpeg_exe(),
             "noplaylist": not self.playlist.get(),
@@ -519,15 +586,20 @@ class App(tk.Tk):
         if self.subs.get():
             opts.update({"writesubtitles": True, "writeautomaticsub": True,
                          "subtitleslangs": ["all", "-live_chat"], "subtitlesformat": "srt/vtt/best"})
+        # tidy titles before naming files (see TITLE_RULES)
+        title_pp = {"key": "MetadataParser", "when": "pre_process",
+                    "actions": [(MetadataParserPP.replacer, "title", p, r) for p, r in TITLE_RULES]}
         if label.startswith("Audio"):
-            opts["postprocessors"] = [{"key": "FFmpegExtractAudio", "preferredcodec": "mp3",
-                                       "preferredquality": "192"}]
+            opts["postprocessors"] = [title_pp, {"key": "FFmpegExtractAudio", "preferredcodec": "mp3",
+                                                 "preferredquality": "192"}]
         else:
             opts["merge_output_format"] = "mp4"
+            opts["postprocessors"] = [title_pp]
             if self.subs.get():
                 # put the subtitles INSIDE the .mp4 (turn on with the CC button in any player);
                 # keep the file for a moment so we can build the readable transcript from it
                 opts["postprocessors"] = [
+                    title_pp,
                     # YouTube etc. deliver .vtt - convert to .srt, the format every Windows player reads
                     {"key": "FFmpegSubtitlesConvertor", "format": "srt", "when": "before_dl"},
                     {"key": "FFmpegEmbedSubtitle", "already_have_subtitle": True},

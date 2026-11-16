@@ -26,7 +26,8 @@ Every time:       1. Copy the Canvas lecture page link from your browser.
                   2. Open Video Downloader (it pastes the link for you).
                   3. Click Download.
 
-You get, in Downloads\Videos (changeable):
+You get, in Downloads\Videos (changeable). Lecture files are named by session,
+e.g. "M6U3 LS1 - Lilian Ho":
    * the lecture video (.mp4)
    * "<title>.srt" - subtitles with the same name as the video. Windows Media
      Player, Films & TV and VLC load it automatically: just press CC.
@@ -84,4 +85,7 @@ TROUBLESHOOTING
 * "No captions available": that recording has no captions in Panopto.
 * "Captions still refused" (YouTube): YouTube limits caption downloads. The video
   is saved anyway; download it again later to get the captions.
+* "The system cannot find the path specified" when opening a file: the folder path
+  is too long for Windows (over 260 characters in total). Choose a shorter
+  "Save to" folder; the app warns you when a folder is too long.
 * Logs for support: File > Open log folder.

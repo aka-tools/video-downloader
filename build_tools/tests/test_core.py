@@ -18,7 +18,10 @@ sys.path.insert(0, APP)
 
 import importlib.util  # noqa: E402
 
-HAVE_TK = importlib.util.find_spec("tkinter") is not None
+try:
+    HAVE_TK = importlib.util.find_spec("tkinter") is not None
+except ValueError:          # tkinter already imported/stubbed
+    HAVE_TK = "tkinter" in sys.modules
 
 import transcript  # noqa: E402
 import updater  # noqa: E402
@@ -131,6 +134,22 @@ class AppTests(unittest.TestCase):
     def setUpClass(cls):
         global vd
         import video_downloader as vd
+
+    def test_lecture_titles_put_session_code_first(self):
+        self.assertEqual(vd.tidy_title("MAICEN | 0526 | M6U3 | LS1 | Lilian Ho"), "M6U3 LS1 - Lilian Ho")
+        self.assertEqual(vd.tidy_title("Intro | Tutorial"), "Intro - Tutorial")
+
+    def test_names_fit_windows_260_limit_even_in_deep_vault_folder(self):
+        for folder_len in (30, 150, 212, 240):
+            folder = os.path.join(tempfile.gettempdir(), "x" * 400)[:folder_len]
+            if vd.folder_too_long(folder):      # can't fit at all: the app warns before downloading
+                self.assertGreaterEqual(folder_len, 225)
+                continue
+            tmpl, chars, _ = vd.name_template(folder)
+            longest = os.path.abspath(folder) + os.sep + "T" * chars + vd.LONGEST_SUFFIX
+            if "%(id)" in tmpl:
+                longest += " 12345678"
+            self.assertLessEqual(len(longest), vd.WIN_MAX_PATH, f"folder of {folder_len} chars")
 
     def test_tokens_redacted_from_logs(self):
         self.assertEqual(vd.redact("https://cdn.x/v.m3u8?token=SECRET"), "https://cdn.x/v.m3u8?…")
